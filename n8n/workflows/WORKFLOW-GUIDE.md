@@ -1,14 +1,17 @@
-Sen7inel — Guia de Configuração n8n
-Pipeline Completo: Erro → Patch → Verificação → PR
+# Sen7inel — n8n Configuration Guide
+# Complete Pipeline: Error → Patch → Verification → PR
 
-Visão Geral do Workflow
+---
+
+## Workflow Overview
+```
 [Webhook Trigger]
       ↓
 [Load Client Context]
       ↓
 [Build Generator Prompt]
       ↓
-[Claude 3.5 Sonnet — Generate Patch]        ← iteration counter aqui
+[Claude 3.5 Sonnet — Generate Patch]        ← iteration counter here
       ↓
 [Gemini Adversarial Review]
       ↓ APPROVE         ↓ REJECT (max 2x → Human Escalation)
@@ -25,17 +28,25 @@ Visão Geral do Workflow
 [IF: iteration < 3?]
       ↓ YES              ↓ NO (max retries)
 [Back to Claude]    [Human Escalation Alert]
+```
 
-Nó 1 — Webhook Trigger
-Tipo: Webhook
+---
+
+## Node 1 — Webhook Trigger
+
+**Type**: `Webhook`
+```
 Method:    POST
 Path:      /sen7inel/fix
 Auth:      Header Auth
   Header:  X-Sen7inel-Signature
   Value:   {{ $env.SEN7INEL_WEBHOOK_SECRET }}
 Response:  Immediately (async processing)
-Body esperado (JSON):
-json{
+```
+
+**Expected body (JSON):**
+```json
+{
   "client_id": "example-client",
   "anomaly_type": "null_pointer_exception",
   "anomaly_description": "TypeError: Cannot read properties of null at users.ts:47",
@@ -43,9 +54,14 @@ json{
   "affected_files": ["src/users/queries.ts"],
   "repo_path": "/opt/sen7inel/repos/example-client"
 }
+```
 
-Nó 2 — Load Client Context
-Tipo: Execute Command
+---
+
+## Node 2 — Load Client Context
+
+**Type**: `Execute Command`
+```
 Command:
 cat /opt/sen7inel/client-profiles/{{ $json.client_id }}/FORBIDDEN.md
 echo "---STACK---"
@@ -53,8 +69,11 @@ cat /opt/sen7inel/client-profiles/{{ $json.client_id }}/STACK.md
 echo "---SKILLS---"
 cat /opt/sen7inel/.agent/skills/security/flat-architecture.md
 cat /opt/sen7inel/.agent/skills/meta/complexity-budget.md
-Set Variables (Code node após):
-javascript// Captura o output e inicializa o contador de iterações
+```
+
+**Set Variables** (Code node after):
+```javascript
+// Capture output and initialize iteration counter
 return [{
   json: {
     ...items[0].json,
@@ -68,12 +87,17 @@ return [{
       .slice(0, 16),
   }
 }];
+```
 
-Nó 3 — Build Generator Prompt
-Tipo: Code (JavaScript)
-javascriptconst item = items[0].json;
+---
 
-// Monta o prompt completo — FORBIDDEN primeiro, sempre
+## Node 3 — Build Generator Prompt
+
+**Type**: `Code (JavaScript)`
+```javascript
+const item = items[0].json;
+
+// Build full prompt — FORBIDDEN first, always
 const systemPrompt = `
 ${item.client_context}
 
@@ -82,7 +106,7 @@ ${item.client_context}
 ${require('fs').readFileSync('/opt/sen7inel/prompts/generator-claude-system-prompt.md', 'utf8')}
 `.trim();
 
-// Se é uma retry, adiciona o contexto de erro anterior
+// If retry, add previous error context
 let userMessage = `
 [ANOMALY]
 Type: ${item.anomaly_type}
@@ -94,7 +118,7 @@ ${item.stack_trace ?? 'Not provided'}
 ${item.affected_files.map(f => `File: ${f}`).join('\n')}
 `.trim();
 
-// Adiciona contexto de retry se existir
+// Add retry context if it exists
 if (item.refinementContext) {
   userMessage = `
 [PREVIOUS_ATTEMPT_FAILED]
@@ -109,7 +133,7 @@ ${userMessage}
 `.trim();
 }
 
-// Adiciona instrução de flatten se for complexity retry
+// Add flatten instruction if complexity retry
 if (item.flattenRequest) {
   userMessage = `
 [REFACTOR_REQUIRED — DO NOT FIX NEW BUGS, ONLY FLATTEN COMPLEXITY]
@@ -134,9 +158,14 @@ return [{
     generator_user_message: userMessage,
   }
 }];
+```
 
-Nó 4 — Claude 3.5 Sonnet (Patch Generator)
-Tipo: HTTP Request
+---
+
+## Node 4 — Claude 3.5 Sonnet (Patch Generator)
+
+**Type**: `HTTP Request`
+```
 Method:  POST
 URL:     https://api.anthropic.com/v1/messages
 
@@ -158,11 +187,14 @@ Body (JSON):
     }
   ]
 }
-Code node após (extrair patch do response):
-javascriptconst response = items[0].json;
+```
+
+**Code node after** (extract patch from response):
+```javascript
+const response = items[0].json;
 const content = response.content?.[0]?.text ?? '';
 
-// Detecta se o Claude pediu decomposição
+// Detect if Claude requested decomposition
 const isDecompose = content.trim().startsWith('DECOMPOSE');
 
 return [{
@@ -171,12 +203,17 @@ return [{
     patch_content: isDecompose ? '' : content,
     decompose_requested: isDecompose,
     decompose_content: isDecompose ? content : null,
-    claude_raw_response: content.slice(0, 500), // para audit log
+    claude_raw_response: content.slice(0, 500), // for audit log
   }
 }];
+```
 
-Nó 5 — Gemini Adversarial Review
-Tipo: HTTP Request
+---
+
+## Node 5 — Gemini Adversarial Review
+
+**Type**: `HTTP Request`
+```
 Method:  POST
 URL:     https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent
 
@@ -203,8 +240,11 @@ Body (JSON):
     "stopSequences": ["\n\n"]
   }
 }
-Code node após (parsear resposta binária):
-javascriptconst responseText = items[0].json
+```
+
+**Code node after** (parse binary response):
+```javascript
+const responseText = items[0].json
   .candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 
 const isApproved = responseText.trim().startsWith('APPROVE');
@@ -231,26 +271,37 @@ return [{
     reviewer_reject_severity: rejectSeverity,
   }
 }];
+```
 
-Nó 6 — IF: Reviewer Approved?
-Tipo: IF
+---
+
+## Node 6 — IF: Reviewer Approved?
+
+**Type**: `IF`
+```
 Condition:
   Value 1:   {{ $json.reviewer_approved }}
   Operation: Equal
   Value 2:   true (Boolean)
 
-True  → Nó 7 (Execute Fix)
-False → Nó 6b (IF: Reviewer Retry?)
-Nó 6b — IF: Reviewer Retry Allowed?
+True  → Node 7 (Execute Fix)
+False → Node 6b (IF: Reviewer Retry?)
+```
+
+### Node 6b — IF: Reviewer Retry Allowed?
+```
 Condition:
   Value 1:   {{ $json.iteration }}
   Operation: Smaller Than
   Value 2:   3
 
-True  → Volta ao Nó 3 (Build Generator Prompt) com reject context
-False → Nó HUMAN ESCALATION
-Set node antes de voltar (adicionar contexto de rejeição):
-javascriptreturn [{
+True  → Back to Node 3 (Build Generator Prompt) with reject context
+False → HUMAN ESCALATION node
+```
+
+**Set node before returning** (add rejection context):
+```javascript
+return [{
   json: {
     ...items[0].json,
     iteration: items[0].json.iteration + 1,
@@ -264,9 +315,14 @@ javascriptreturn [{
     flattenRequest: null,
   }
 }];
+```
 
-Nó 7 — Execute Fix (Sandbox)
-Tipo: Execute Command
+---
+
+## Node 7 — Execute Fix (Sandbox)
+
+**Type**: `Execute Command`
+```
 Command:
 node /opt/sen7inel/sandbox/scripts/execute-fix.js \
   --client-id={{ $json.client_id }} \
@@ -276,11 +332,17 @@ node /opt/sen7inel/sandbox/scripts/execute-fix.js \
   --patch-content={{ $json.patch_content }}
 
 Working Directory: /opt/sen7inel
-⚠️ IMPORTANTE — Opções do Execute Command:
-Continue on Fail: TRUE   ← obrigatório, exit codes 1/2/3 não devem parar o workflow
+```
+
+**⚠️ IMPORTANT — Execute Command options:**
+```
+Continue on Fail: TRUE   ← mandatory, exit codes 1/2/3 must not stop the workflow
 Capture Stderr:   TRUE
-Code node após (parsear JSON do bridge):
-javascriptconst stdout = items[0].json.stdout ?? '{}';
+```
+
+**Code node after** (parse bridge JSON):
+```javascript
+const stdout = items[0].json.stdout ?? '{}';
 
 let verifyResult;
 try {
@@ -296,56 +358,79 @@ try {
   };
 }
 
-// Merge: mantém contexto original + adiciona resultado do verifier
+// Merge: keep original pipeline context + add verifier result
 return [{
   json: {
-    ...items[0].json,     // contexto do pipeline (client_id, iteration, etc.)
-    ...verifyResult,      // resultado completo do verifier + routing flags
+    ...items[0].json,     // pipeline context (client_id, iteration, etc.)
+    ...verifyResult,      // full verifier result + routing flags
     exit_code: items[0].json.exitCode ?? 3,
   }
 }];
+```
 
-Nó 8 — IF: isGreen?
-Tipo: IF
+---
+
+## Node 8 — IF: isGreen?
+
+**Type**: `IF`
+```
 Condition:
   Value 1:   {{ $json.isGreen }}
   Operation: Equal
   Value 2:   true (Boolean)
 
-True  → Nó 9 (Create Pull Request)
-False → Nó 8b (IF: Complexity?)
+True  → Node 9 (Create Pull Request)
+False → Node 8b (IF: Complexity?)
+```
 
-Nó 8b — IF: needsComplexityFlatten?
-Tipo: IF
+---
+
+## Node 8b — IF: needsComplexityFlatten?
+
+**Type**: `IF`
+```
 Condition:
   Value 1:   {{ $json.needsComplexityFlatten }}
   Operation: Equal
   Value 2:   true (Boolean)
 
-True  → Nó 8c (IF: Iteration < Max?)  com flattenRequest no payload
-False → Nó 8c (mesmo) com refinementContext no payload
+True  → Node 8c (IF: Iteration < Max?) with flattenRequest in payload
+False → Node 8c (same) with refinementContext in payload
+```
 
-Nó 8c — IF: Iteration < Max?
-Tipo: IF
+---
+
+## Node 8c — IF: Iteration < Max?
+
+**Type**: `IF`
+```
 Condition:
   Value 1:   {{ $json.iteration }}
   Operation: Smaller Than
-  Value 2:   {{ $json.max_iterations }}   (valor: 3)
+  Value 2:   {{ $json.max_iterations }}   (value: 3)
 
-True  → Set node → Incrementa iteration → Volta ao Nó 3
-False → Nó HUMAN ESCALATION
-Set node (incrementar iteração):
-javascriptreturn [{
+True  → Set node → Increment iteration → Back to Node 3
+False → HUMAN ESCALATION node
+```
+
+**Set node (increment iteration):**
+```javascript
+return [{
   json: {
     ...items[0].json,
     iteration: items[0].json.iteration + 1,
-    // flattenRequest e refinementContext já estão no payload
-    // vindos do execute-fix.js — não precisa recriar
+    // flattenRequest and refinementContext are already in the payload
+    // coming from execute-fix.js — no need to recreate
   }
 }];
+```
 
-Nó 9 — Create Pull Request
-Tipo: HTTP Request
+---
+
+## Node 9 — Create Pull Request
+
+**Type**: `HTTP Request`
+```
 Method:  POST
 URL:     https://api.github.com/repos/{{ $json.github_owner }}/{{ $json.github_repo }}/pulls
 
@@ -362,10 +447,15 @@ Body (JSON):
   "base": "main",
   "draft": false
 }
+```
 
-Nó 10 — Human Escalation Alert
-Tipo: HTTP Request (Slack Webhook ou WhatsApp via Evolution API)
-javascript// Code node para montar o alerta
+---
+
+## Node 10 — Human Escalation Alert
+
+**Type**: `HTTP Request` (Slack Webhook or WhatsApp via Evolution API)
+```javascript
+// Code node to build the alert message
 const item = items[0].json;
 
 const statusEmoji = {
@@ -375,23 +465,28 @@ const statusEmoji = {
   REVIEWER_REJECTED: '🔵',
 }[item.status] ?? '⚠️';
 
-const message = `${statusEmoji} *Sen7inel — Escalação Humana*
+const message = `${statusEmoji} *Sen7inel — Human Escalation*
 
-*Cliente:* ${item.client_id}
+*Client:* ${item.client_id}
 *Status:* \`${item.status}\`
-*Iterações tentadas:* ${item.iteration}/${item.max_iterations}
+*Iterations attempted:* ${item.iteration}/${item.max_iterations}
 *Patch Hash:* \`${item.patch_hash}\`
-*Anomalia:* ${item.anomaly_type}
+*Anomaly:* ${item.anomaly_type}
 
-*Motivo:*
-${item.refinementContext?.errorOutput?.slice(0, 300) ?? item.error ?? 'Sem detalhes'}
+*Reason:*
+${item.refinementContext?.errorOutput?.slice(0, 300) ?? item.error ?? 'No details available'}
 
-Acesse o n8n para revisar: https://${process.env.N8N_HOST}/workflow`;
+Review in n8n: https://${process.env.N8N_HOST}/workflow`;
 
 return [{ json: { text: message } }];
+```
 
-Nó 11 — Audit Log (Supabase)
-Tipo: HTTP Request (após TODOS os branches — Green, Red, Escalation)
+---
+
+## Node 11 — Audit Log (Supabase)
+
+**Type**: `HTTP Request` (after ALL branches — Green, Red, Escalation)
+```
 Method:  POST
 URL:     https://{{ $env.SUPABASE_URL }}/rest/v1/pipeline_runs
 
@@ -418,18 +513,27 @@ Body (JSON):
   "refinement_count":   {{ $json.iteration - 1 }},
   "patch_diff":         "{{ $json.patch_content?.slice(0, 10000) }}"
 }
+```
 
-Resumo dos Exit Codes (n8n routing)
-Exit CodeStatusAção no n8n 
-0 GREEN→ Create Pull Request 
-1 RED_TEST / TYPE / LINT→ Build Refinement Prompt → Claude
-2 COMPLEXITY_VIOLATION→ Build Flatten Prompt → Claude
-2 PATCH_TOO_LARGE→ Decompose → Sub-tasks
-3 SYSTEM_ERROR→ Human Escalation (imediato)
-Leitura do Exit Code no n8n
-O Execute Command node expõe {{ $json.exitCode }}.
-Use um IF node logo após com essa condição para routing primário:
+---
+
+## Exit Codes Summary (n8n routing)
+
+| Exit Code | Status | Action in n8n |
+|---|---|---|
+| 0 | GREEN | → Create Pull Request |
+| 1 | RED_TEST / TYPE / LINT | → Build Refinement Prompt → Claude |
+| 2 | COMPLEXITY_VIOLATION | → Build Flatten Prompt → Claude |
+| 2 | PATCH_TOO_LARGE | → Decompose → Sub-tasks |
+| 3 | SYSTEM_ERROR | → Human Escalation (immediate) |
+
+## Reading Exit Codes in n8n
+
+The Execute Command node exposes `{{ $json.exitCode }}`.
+Use an IF node right after with this condition for primary routing:
+```
 exitCode == 0  → isGreen branch
-exitCode == 1  → refinement branch  
+exitCode == 1  → refinement branch
 exitCode == 2  → complexity/flatten branch
-exitCode >= 3  → human escalation (sempre)
+exitCode >= 3  → human escalation (always)
+```

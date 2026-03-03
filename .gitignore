@@ -2,12 +2,12 @@
 # Sen7inel — .gitignore
 # ============================================================
 
-# Secrets — NUNCA no Git
+# Secrets — NEVER in Git
 .env
 .env.*
 !.env.example
 
-# Resultados efêmeros do sandbox
+# Ephemeral sandbox results
 /tmp/
 **/sen7inel-results/
 
@@ -28,9 +28,9 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
-# Repositórios dos clientes (montados em runtime)
+# Client repositories (mounted at runtime)
 /opt/sen7inel/repos/
 
-# Patches temporários
+# Temporary patches
 *.diff
 *.patch
