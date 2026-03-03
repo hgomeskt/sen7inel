@@ -1,0 +1,36 @@
+# ============================================================
+# Sen7inel — .gitignore
+# ============================================================
+
+# Secrets — NUNCA no Git
+.env
+.env.*
+!.env.example
+
+# Resultados efêmeros do sandbox
+/tmp/
+**/sen7inel-results/
+
+# Node
+node_modules/
+dist/
+build/
+*.js.map
+
+# TypeScript build
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Repositórios dos clientes (montados em runtime)
+/opt/sen7inel/repos/
+
+# Patches temporários
+*.diff
+*.patch

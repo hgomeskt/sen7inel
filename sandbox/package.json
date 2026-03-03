@@ -1,0 +1,17 @@
+{
+  "name": "sen7inel-sandbox",
+  "version": "1.0.0",
+  "description": "Ephemeral verification sandbox for Sen7inel",
+  "type": "module",
+  "main": "src/entrypoint.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.sandbox.json",
+    "test:dry": "node src/entrypoint.js --dry-run"
+  },
+  "dependencies": {
+    "ts-morph": "^21.0.1"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
