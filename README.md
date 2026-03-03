@@ -191,9 +191,3 @@ Inspired by the **"AI-Assisted Development — Velocity without Theatre"** workf
 
 Proprietary — Hernane Gomes & Thiago Butignon · Insightloop Consultoria de TI © 2025
 ```
-
-Depois **Ctrl+S** e no terminal:
-```
-git add README.md
-git commit -m "docs: fix README markdown formatting"
-git push
