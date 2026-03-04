@@ -189,5 +189,5 @@ Inspired by the **"AI-Assisted Development — Velocity without Theatre"** workf
 
 ## License
 
-Proprietary — Hernane Gomes & Thiago Butignon · Insightloop Consultoria de TI © 2025
+Proprietary — Hernane Gomes & Thiago Butignon · Insightloop Consultoria de TI © 2026
 ```
