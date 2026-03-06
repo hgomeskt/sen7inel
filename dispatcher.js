@@ -18,6 +18,8 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
+import * as dotenv from "dotenv";
+dotenv.config();
 import { readFileSync, existsSync, writeFileSync } from "fs";
 import { execSync } from "child_process";
 import { join } from "path";
