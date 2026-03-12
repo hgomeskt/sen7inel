@@ -26,7 +26,31 @@ describe('users queries', () => {
     });
 
     it('should throw error when user does not exist', () => {
-      expect(() => processUser('unknown')).toThrow('User not found: unknown');
+      expect(() => processUser('unknown')).toThrow('User not found or invalid: unknown');
+    });
+
+    it('should handle null user gracefully', () => {
+      // Mock getUser to return null for this test
+      const originalGetUser = require('./queries').getUser;
+      const queries = require('./queries');
+      queries.getUser = jest.fn().mockReturnValue(null);
+
+      expect(() => processUser('test-null')).toThrow('User not found or invalid: test-null');
+
+      // Restore original function
+      queries.getUser = originalGetUser;
+    });
+
+    it('should handle undefined user gracefully', () => {
+      // Mock getUser to return undefined for this test
+      const originalGetUser = require('./queries').getUser;
+      const queries = require('./queries');
+      queries.getUser = jest.fn().mockReturnValue(undefined);
+
+      expect(() => processUser('test-undefined')).toThrow('User not found or invalid: test-undefined');
+
+      // Restore original function
+      queries.getUser = originalGetUser;
     });
   });
 
@@ -37,7 +61,7 @@ describe('users queries', () => {
     });
 
     it('should throw error for unknown user', () => {
-      expect(() => handleRequest('unknown')).toThrow('User not found: unknown');
+      expect(() => handleRequest('unknown')).toThrow('User not found or invalid: unknown');
     });
   });
 });

@@ -23,14 +23,33 @@ export function getUser(id: string): User | null {
 export function processUser(userId: string): ProcessedUser {
   const user = getUser(userId);
 
-  if (user === null) {
-    throw new Error(`User not found: ${userId}`);
+  // Explicit null check with early return
+  if (user === null || user === undefined) {
+    throw new Error(`User not found or invalid: ${userId}`);
+  }
+
+  // Direct access to properties since null check passed
+  const id = user.id;
+  const name = user.name;
+  const email = user.email;
+
+  // Validate all required fields are present and valid
+  if (!id || typeof id !== 'string' || id.trim() === '') {
+    throw new Error(`User not found or invalid: ${userId}`);
+  }
+  
+  if (!name || typeof name !== 'string' || name.trim() === '') {
+    throw new Error(`User not found or invalid: ${userId}`);
+  }
+  
+  if (!email || typeof email !== 'string' || email.trim() === '') {
+    throw new Error(`User not found or invalid: ${userId}`);
   }
 
   return {
-    userId: user.id,
-    displayName: user.name,
-    contact: user.email,
+    userId: id,
+    displayName: name,
+    contact: email,
   };
 }
 
