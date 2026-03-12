@@ -18,7 +18,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import { readFileSync, existsSync, writeFileSync } from "fs";
+import { readFileSync, existsSync, writeFileSync, readdirSync } from "fs";
 import { execSync } from "child_process";
 import { join } from "path";
 
@@ -160,6 +160,20 @@ const tools = [
         message: { type: "string", description: "Status details" },
       },
       required: ["phase", "status", "message"],
+      },
+  },
+  {
+    name: "list_directory",
+    description: "List files and folders in a directory.",
+    input_schema: {
+      type: "object",
+      properties: {
+        path: {
+          type: "string",
+          description: "Relative path to the directory",
+        },
+      },
+      required: ["path"],
     },
   },
 ];
@@ -294,7 +308,19 @@ function executeTool(name, input) {
       console.log(`\n${emoji} [${input.phase}] ${input.status}: ${input.message}`);
       return { logged: true };
     }
-
+case "list_directory": {
+  const dirPath = join(ROOT, input.path);
+  if (!existsSync(dirPath)) {
+    return { error: `Directory not found: ${input.path}` };
+  }
+  const items = readdirSync(dirPath, { withFileTypes: true });
+  const result = items.map((item) => ({
+    name: item.name,
+    type: item.isDirectory() ? "directory" : "file",
+  }));
+  console.log(`   ✅ Listed ${result.length} items in ${input.path}`);
+  return { items: result, path: input.path };
+}
     default:
       return { error: `Unknown tool: ${name}` };
   }
