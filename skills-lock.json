@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "dbg": {
+      "source": "theodo-group/debug-that",
+      "sourceType": "github",
+      "computedHash": "f991fb1f6ad05bbb86c83fe8b59ee7bfd245a6b7ff9adf2cdeed1e1da0b6be3e"
+    }
+  }
+}
